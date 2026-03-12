@@ -1,45 +1,52 @@
 #pragma once
 #include <vector>
-#include <cstddef>
 #include <initializer_list>
+#include <random>
 #include <stdexcept>
 
 template<typename T>
 class ColumnVector {
 public:
     ColumnVector() : n_(0) {}
-    explicit ColumnVector(std::size_t n, const T& val = T()) : n_(n), data_(n, val) {}
-    ColumnVector(std::initializer_list<T> init) : n_(init.size()), data_(init.begin(), init.end()) {}
+    explicit ColumnVector(int n, const T& val = T()) : n_(n), data_(n, val) {}
+    ColumnVector(std::initializer_list<T> init) : n_(0), data_(init.begin(), init.end()) {
+        n_ = data_.size();
+    }
 
-    T& operator[](std::size_t i) { return data_.at(i); }
-    const T& operator[](std::size_t i) const { return data_.at(i); }
+    T& operator[](int i) { return data_.at(i); }
+    const T& operator[](int i) const { return data_.at(i); }
 
-    std::size_t size() const noexcept { return n_; }
+    int size() const noexcept { return n_; }
+
+    void resize(int n, const T& val = T()) {
+        n_ = n;
+        data_.assign(n, val);
+    }
 
     T dot(const ColumnVector& other) const {
         if (n_ != other.n_) throw std::invalid_argument("dot product: vector sizes must match");
         T s = T();
-        for (std::size_t i = 0; i < n_; ++i) s += data_[i] * other.data_[i];
+        for (int i = 0; i < n_; ++i) s += data_[i] * other.data_[i];
         return s;
     }
 
     ColumnVector operator+(const ColumnVector& other) const {
         if (n_ != other.n_) throw std::invalid_argument("addition: vector sizes must match");
         ColumnVector out(n_);
-        for (std::size_t i = 0; i < n_; ++i) out.data_[i] = data_[i] + other.data_[i];
+        for (int i = 0; i < n_; ++i) out.data_[i] = data_[i] + other.data_[i];
         return out;
     }
     
     // scalar multiplication (vector * scalar)
     ColumnVector operator*(const T& scalar) const {
         ColumnVector out(n_);
-        for (std::size_t i = 0; i < n_; ++i) out.data_[i] = data_[i] * scalar;
+        for (int i = 0; i < n_; ++i) out.data_[i] = data_[i] * scalar;
         return out;
     }
     
     // in-place scalar multiply
     ColumnVector& operator*=(const T& scalar) {
-        for (std::size_t i = 0; i < n_; ++i) data_[i] *= scalar;
+        for (int i = 0; i < n_; ++i) data_[i] *= scalar;
         return *this;
     }
     
@@ -49,7 +56,7 @@ public:
     }
 
 private:
-    std::size_t n_;
+    int n_;
     std::vector<T> data_;
 };
 
@@ -57,40 +64,51 @@ template<typename T>
 class Matrix {
 public:
     Matrix() : rows_(0), cols_(0) {}
-    Matrix(std::size_t r, std::size_t c, const T& val = T()) : rows_(r), cols_(c), data_(r * c, val) {}
+    Matrix(int r, int c, const T& val = T()) : rows_(r), cols_(c), data_(r * c, val) {}
 
-    T& operator()(std::size_t i, std::size_t j) { return data_.at(i * cols_ + j); }
-    const T& operator()(std::size_t i, std::size_t j) const { return data_.at(i * cols_ + j); }
+    T& operator()(int i, int j) { return data_.at(i * cols_ + j); }
+    const T& operator()(int i, int j) const { return data_.at(i * cols_ + j); }
 
-    ColumnVector<T> col(std::size_t j) const {
+    ColumnVector<T> col(int j) const {
         if (j >= cols_) throw std::out_of_range("column index out of range");
         ColumnVector<T> out(rows_);
-        for (std::size_t i = 0; i < rows_; ++i) out[i] = this->operator()(i, j);
+        for (int i = 0; i < rows_; ++i) out[i] = this->operator()(i, j);
         return out;
     }
 
+    int rows() const noexcept { return rows_; }
+    int cols() const noexcept { return cols_; }
+
+    T dot_col(const ColumnVector<T>& v, int j) const {
+        if (v.size() != rows_) throw std::invalid_argument("dot_col: vector size must match row count");
+        if (j >= cols_) throw std::out_of_range("dot_col: column index out of range");
+
+        T s = T();
+        for (int i = 0; i < rows_; ++i) s += v[i] * this->operator()(i, j);
+        return s;
+    }
+
 private:
-    std::size_t rows_, cols_;
+    int rows_, cols_;
     std::vector<T> data_;
 };
 
 class Perceptron
 {
     public:
-        Perceptron(){
-            w = ColumnVector<double>();
-            b = 0.0;
-            learning_rate = 0.01;
-        };
-        void fit(const Matrix<double>& X, const std::vector<int>& y);
-        int predict(const ColumnVector<double>& x);
+        Perceptron()
+            : b(0.0), learning_rate(0.01), max_iters(1000), w(), rng_(std::random_device{}()) {}
+
+        void train(const Matrix<double>& X, const ColumnVector<int>& y);
     private:
         double b, learning_rate;
+        int max_iters;
         ColumnVector<double> w;
+        std::mt19937 rng_;
         std::vector<int> misclassified_indices;
-        int sign(Matrix<double>& X, int idx);
-        double loss(Matrix<double>& X, std::vector<int>& Y);
-        void SGD(Matrix<double>& X, std::vector<int>& Y);
-        bool is_misclassified(Matrix<double>& X, ColumnVector<int>& y, int idx);
+        int sign(const Matrix<double>& X, int idx) const;
+        double loss(const Matrix<double>& X, const ColumnVector<int>& y) const;
+        void SGD(const Matrix<double>& X, const ColumnVector<int>& y);
+        bool is_misclassified(const Matrix<double>& X, const ColumnVector<int>& y, int idx) const;
         int random_index();
 };

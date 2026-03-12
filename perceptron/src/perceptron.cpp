@@ -1,36 +1,48 @@
 #include "perceptron.hpp"
-#include <random>
 
-int Perceptron::sign(Matrix<double>& X, int idx)
+int Perceptron::sign(const Matrix<double>& X, int idx) const
 {
-    double dot = w.dot(X.col(idx));
-    return (dot + b >= 0.0) ? 1 : -1;
+    return (X.dot_col(w, idx) + b >= 0.0) ? 1 : -1;
 }
 
-double Perceptron::loss(Matrix<double>& X, std::vector<int>& Y)
+double Perceptron::loss(const Matrix<double>& X, const ColumnVector<int>& y) const
 {
     double total_loss = 0.0;
-    for(int idx : misclassified_indices)
-        total_loss -= Y[idx] * (w.dot(X.col(idx)) + b);
+    for (int idx : misclassified_indices)
+        total_loss -= y[idx] * (X.dot_col(w, idx) + b);
     return total_loss;
 }
 
-void Perceptron::SGD(Matrix<double>& X, std::vector<int>& Y)
+void Perceptron::SGD(const Matrix<double>& X, const ColumnVector<int>& y)
 {
     int idx = random_index();
-    w = w + X.col(idx) * Y[idx] * learning_rate;
-    b += Y[idx] * learning_rate;
+    double step = y[idx] * learning_rate;
+
+    for (int i = 0; i < w.size(); ++i)
+        w[i] += X(i, idx) * step;
+    b += step;
 }
 
-bool Perceptron::is_misclassified(Matrix<double>& X, ColumnVector<int>& Y, int idx)
+bool Perceptron::is_misclassified(const Matrix<double>& X, const ColumnVector<int>& y, int idx) const
 {
-    return Y[idx] * (w.dot(X.col(idx)) + b) <= 0.0;
+    return y[idx] * (X.dot_col(w, idx) + b) <= 0.0;
 }
 
 int Perceptron::random_index()
 {
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<> dis(0, misclassified_indices.size() - 1);
-    return misclassified_indices[dis(gen)];
+    std::uniform_int_distribution<int> dis(0, misclassified_indices.size() - 1);
+    return misclassified_indices[dis(rng_)];
+}
+
+void Perceptron::train(const Matrix<double>& X, const ColumnVector<int>& y)
+{
+    int n = y.size();
+    for (int iter = 0; iter < max_iters; iter++) {
+        misclassified_indices.clear();
+        for (int i = 0; i < n; i++)
+            if (is_misclassified(X, y, i))
+                misclassified_indices.push_back(i);
+        if (misclassified_indices.empty()) break;
+        SGD(X, y);
+    }
 }
