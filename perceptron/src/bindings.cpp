@@ -5,18 +5,28 @@
 namespace py = pybind11;
 
 PYBIND11_MODULE(perceptron_cpp, m) {
+    py::class_<ColumnVector<int>>(m, "IntVector")
+        .def(py::init<int>())
+        .def("set", [](ColumnVector<int> &v, int i, int val) { v[i] = val; })
+        .def("__getitem__", [](const ColumnVector<int> &v, int i) { return v[i]; })
+        .def("__len__", &ColumnVector<int>::size);
+
+    py::class_<ColumnVector<double>>(m, "DoubleVector")
+        .def(py::init<int>())
+        .def("set", [](ColumnVector<double> &v, int i, double val) { v[i] = val; })
+        .def("__getitem__", [](const ColumnVector<double> &v, int i) { return v[i]; })
+        .def("__len__", &ColumnVector<double>::size);
+
     py::class_<Matrix<double>>(m, "Matrix")
-        .def(py::init<size_t, size_t>())
-        .def("__setitem__", [](Matrix<double> &m, std::pair<size_t, size_t> i, double v) {
-            m(i.first, i.second) = v;
-        });
+        .def(py::init<int, int>())
+        .def("set", [](Matrix<double> &mat, int r, int c, double val) { mat(r, c) = val; });
 
     py::class_<Perceptron>(m, "Perceptron")
-        .def(py::init<double, int>())
+        .def(py::init<>())
+        .def_readwrite("b", &Perceptron::b)
+        .def_readwrite("w", &Perceptron::w)
+        .def_readwrite("learning_rate", &Perceptron::learning_rate)
+        .def_readwrite("max_iters", &Perceptron::max_iters)
         .def("train", &Perceptron::train)
-        .def("predict", [](Perceptron &self, std::vector<double> x_raw) {
-            ColumnVector<double> x(x_raw.size());
-            for(size_t i=0; i<x_raw.size(); ++i) x[i] = x_raw[i];
-            return self.predict(x);
-        });
+        .def("sign", &Perceptron::sign);
 }
