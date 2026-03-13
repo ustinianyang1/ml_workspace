@@ -100,7 +100,7 @@ class Perceptron
         int max_iters;
         ColumnVector<double> w;
         Perceptron()
-            : b(0.0), learning_rate(0.01), max_iters(5000), w(), rng_(std::random_device{}()) {}
+            : b(0.0), learning_rate(0.01), max_iters(10000), w(), rng_(std::random_device{}()) {}
 
         void train(const Matrix<double>& X, const ColumnVector<int>& y);
         int sign(const Matrix<double>& X, int idx) const;
